@@ -39,6 +39,7 @@ import os
 import re
 import shlex
 import threading
+import shlex
 
 from rtemstoolkit import configuration
 from rtemstoolkit import config

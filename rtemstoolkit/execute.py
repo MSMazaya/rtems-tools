@@ -46,6 +46,7 @@ import subprocess
 import threading
 import time
 import traceback
+import socket
 
 from rtemstoolkit import error
 from rtemstoolkit import log
@@ -104,6 +105,46 @@ def arg_subst_str(command, subst):
     cmd = arg_subst(command, subst)
     def add(x, y): return x + ' ' + str(y)
     return functools.reduce(add, cmd, '')
+
+class socket_server():
+    def __init__(self, host, port, name):
+        self.host = host
+        self.port = port
+        self.stop = False
+        self.messages = []
+        self.stdout_thread = threading.Thread(target = self.start_server,
+                                         name = '_stdout[%s]' % (name))
+        self.stdout_thread.daemon = True
+        self.stdout_thread.start()
+
+    def start_server(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+            server.bind((self.host, self.port))
+            server.listen(1)
+
+            conn, addr = server.accept()
+            print(f'Connected by {addr[0]}:{addr[1]}')
+
+            while True:
+                try:
+                    text = conn.recv(1024).decode()
+                    self.messages.append(text)
+
+                    if self.stop:
+                        break
+                except socket.error as e:
+                    print(f'Error while connecting to server: {e}')
+
+            conn.close()
+
+    def read1(self, _):
+        if len(self.messages):
+            return self.messages.pop()
+
+        return ""
+
+    def close(self):
+        self.stop = True
 
 class execute(object):
     """Execute commands or scripts. The 'output' is a funtion that handles the
@@ -186,6 +227,7 @@ class execute(object):
                 #exe.lock.release()
                 try:
                     if out:
+                        # ini self.capture di config.py
                         out(prefix + line)
                     else:
                         log.output(prefix + line)
@@ -277,14 +319,19 @@ class execute(object):
         timeout_thread = None
 
         if proc.stdout:
+            fh = io.open(proc.stdout.fileno(),
+                         mode = 'rb',
+                         closefd = False)
+
+            if 'renode' in command:
+                fh = socket_server("127.0.0.1", 12345, name)
+
             stdout_thread = threading.Thread(target = _readthread,
-                                             name = '_stdout[%s]' % (name),
-                                             args = (self,
-                                                     io.open(proc.stdout.fileno(),
-                                                             mode = 'rb',
-                                                             closefd = False),
-                                                     self.output,
-                                                     ''))
+                                                         name = '_stdout[%s]' % (name),
+                                                         args = (self,
+                                                                 fh,
+                                                                 self.output,
+                                                                 ''))
             stdout_thread.daemon = True
             stdout_thread.start()
         if proc.stderr:
@@ -438,6 +485,7 @@ class execute(object):
                 return (0, proc)
             if self.output is None:
                 raise error.general('capture needs an output handler')
+            # HERE IS THE ACTUAL CALLER OF STDOUT READER
             exit_code = self.capture(proc, command, timeout)
             if self.verbose:
                 log.output('exit: ' + str(exit_code))

@@ -1,0 +1,82 @@
+#
+# RTEMS Tools Project (http://www.rtems.org/)
+# Copyright (C) 2023, 2023 Muhammad Sulthan Mazaya (msulthanmazaya@gmail.com)
+# All rights reserved.
+#
+# This file is part of the RTEMS Tools package in 'rtems-tools'.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+
+using sysbus
+using monitor
+
+mach create "leon3"
+
+machine LoadPlatformDescription @platforms/boards/leon3.repl
+
+path add @/
+
+showAnalyzer "uartAnalyzer" uart Antmicro.Renode.Analyzers.LoggingUartAnalyzer
+uartAnalyzer TimestampFormat None
+
+set report_repeating_line """
+from Antmicro.Renode.Logging import ConsoleBackend 
+ConsoleBackend.Instance.ReportRepeatingLines = True
+"""
+
+set add_hook """
+def my_match(line):
+    ok_to_kill_lines = [
+        '*** TEST STATE: USER_INPUT',
+        '*** TEST STATE: BENCHMARK',
+        '*** END OF TEST ',
+        '*** FATAL ***'
+    ]
+    return any(l in line for l in ok_to_kill_lines)
+
+def my_hook(line):
+    print line
+    monitor.Parse("q")
+
+Antmicro.Renode.Hooks.UartHooksExtensions.AddLineHook(monitor.Machine["sysbus.uart"], my_match, my_hook)
+"""
+
+python $add_hook
+
+python $report_repeating_line 
+
+macro reset
+"""
+    # The leon3-prom-gpl.bin is built using Antmicro's script from their
+    # example of how to use renode to test rtems leon3 using renode-test
+    # https://github.com/antmicro/renode-rtems-leon3/blob/main/build-prom.sh
+    # The source of the assembly file itself is from Gaisler
+    # https://github.com/TUT-ASI/leon3-grlib-gpl-mirror/blob/master/software/leon3/prom.S
+    sysbus LoadBinary @leon3-prom-gpl.bin 0x0
+    sysbus LoadELF $bin
+
+    cpu PC 0
+"""
+
+runMacro $reset

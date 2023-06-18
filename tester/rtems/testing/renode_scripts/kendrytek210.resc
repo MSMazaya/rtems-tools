@@ -7,42 +7,15 @@ machine LoadPlatformDescription @platforms/cpus/kendryte_k210.repl
 
 path add @/
 
-# emulation CreateServerSocketTerminal 3456 'term'
-# connector Connect sysbus.uart term
-
 showAnalyzer "uartAnalyzer" uart Antmicro.Renode.Analyzers.LoggingUartAnalyzer
+uartAnalyzer TimestampFormat None
 
-set add_hook """
-import socket
-
-# Client configuration
-HOST = '127.0.0.1'  # The server's hostname or IP address
-PORT = 12345        # The port used by the server
-
-# Client code
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect((HOST, PORT))
-failed_to_send = []
-
-def send_message(message):
-    client_socket.sendall(message)
-
-def my_match(line):
-   try:
-       while(len(failed_to_send)):
-          send_message(failed_to_send.pop())
-       send_message(line)
-   except:
-       failed_to_send.append(line)
-   return "*** END OF TEST" in line
-
-def my_hook(line):
-    monitor.Parse('q')
-
-Antmicro.Renode.Hooks.UartHooksExtensions.AddLineHook(monitor.Machine["sysbus.uart"], my_match, my_hook)
+set report_repeating_line """
+from Antmicro.Renode.Logging import ConsoleBackend 
+ConsoleBackend.Instance.ReportRepeatingLines = True
 """
 
-python $add_hook
+python $report_repeating_line 
 
 sysbus Tag <0x50440000 0x10000> "SYSCTL"
 sysbus Tag <0x50440018 0x4> "pll_lock" 0xFFFFFFFF

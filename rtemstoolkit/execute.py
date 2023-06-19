@@ -632,11 +632,7 @@ if __name__ == "__main__":
     commands['windows']['csubsts'] = [('netstat %0', ['-a']),
                                       ('netstat %0 %1', ['-a', '-n'])]
     commands['windows']['pipe'] = ('ftp', None, 'help\nquit')
-    commands['windows']['open'] = ['echo', 'hello world',
-                                   '|', 'for', '/f',
-                                   '"tokens=2"', '%i', 'in',
-                                   '(\'more\')', 'do', '@echo',
-                                   '%i']
+    commands['windows']['open'] = ["echo",  "hello rtems", "|", "findstr", "rtems"]
     commands['unix']['shell'] = ['pwd', 'ls -las', './xyz', sh_shell_test]
     commands['unix']['spawn'] = ['ls', 'execute.pyc', ['ls', '-i']]
     commands['unix']['cmd'] = [('date'), ('date', '-R'), ('date', ['-u', '+%d %D']),

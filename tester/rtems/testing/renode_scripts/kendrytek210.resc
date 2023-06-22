@@ -15,6 +15,25 @@ from Antmicro.Renode.Logging import ConsoleBackend
 ConsoleBackend.Instance.ReportRepeatingLines = True
 """
 
+set add_hook """
+def my_match(line):
+    ok_to_kill_lines = [
+        '*** TEST STATE: USER_INPUT',
+        '*** TEST STATE: BENCHMARK',
+        '*** END OF TEST ',
+        '*** FATAL ***'
+    ]
+    return sum(l in line for l in ok_to_kill_lines)
+
+def my_hook(line):
+    print line
+    monitor.Parse("q")
+
+Antmicro.Renode.Hooks.UartHooksExtensions.AddLineHook(monitor.Machine["sysbus.uart"], my_match, my_hook)
+"""
+
+python $add_hook
+
 python $report_repeating_line 
 
 sysbus Tag <0x50440000 0x10000> "SYSCTL"

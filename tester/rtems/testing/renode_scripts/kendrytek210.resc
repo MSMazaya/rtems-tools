@@ -23,7 +23,7 @@ def my_match(line):
         '*** END OF TEST ',
         '*** FATAL ***'
     ]
-    return sum(l in line for l in ok_to_kill_lines)
+    return any(l in line for l in ok_to_kill_lines)
 
 def my_hook(line):
     print line
